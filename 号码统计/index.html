@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="热力图统计">
+<title>热力图统计</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  :root{
+    --bg:#0b1220; --card:#111c2e; --line:#1e2f4a;
+    --fg:#e2e8f0; --fg2:#94a3b8; --fg3:#64748b;
+    --accent:#38bdf8; --accent-fg:#082f49;
+    --hot:#ef4444; --cold:#1d4ed8;
+  }
+  body.light{
+    --bg:#f1f5f9; --card:#ffffff; --line:#e2e8f0;
+    --fg:#0f172a; --fg2:#475569; --fg3:#94a3b8;
+    --accent:#0ea5e9; --accent-fg:#ffffff;
+    --hot:#dc2626; --cold:#2563eb;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--fg);
+    padding:12px;padding-bottom:calc(12px + env(safe-area-inset-bottom));
+    transition:background .2s,color .2s;
+  }
+  h1{font-size:19px;margin:0 0 4px;display:flex;justify-content:space-between;align-items:center}
+  h1 .theme-btn{
+    font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);
+    background:var(--card);color:var(--fg2);cursor:pointer;font-weight:600;
+  }
+  .sub{font-size:12px;color:var(--fg2);margin-bottom:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+  .card h2{font-size:14px;margin:0 0 10px;color:var(--fg);display:flex;justify-content:space-between;align-items:center}
+  .card h2 .tag{font-size:11px;color:var(--fg3);font-weight:400}
+
+  .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  @media(min-width:520px){.stats{grid-template-columns:repeat(4,1fr)}}
+  .stat{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .stat .k{font-size:11px;color:var(--fg2)}
+  .stat .v{font-size:20px;font-weight:800;margin-top:3px}
+  .stat .sub2{font-size:11px;color:var(--fg3);margin-top:2px;word-break:break-all}
+
+  .heat{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .cell{
+    aspect-ratio:1/1;border-radius:8px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;font-weight:800;
+    border:1px solid rgba(127,127,127,.15);position:relative;transition:transform .12s;
+  }
+  .cell:active{transform:scale(.94)}
+  .cell .n{font-size:13px;line-height:1}
+  .cell .c{font-size:10px;opacity:.85;margin-top:2px}
+  .cell.dim{opacity:.3}
+  .cell.star{outline:2px solid #facc15;outline-offset:-1px}
+  .cell.win{outline:2px solid #22c55e;outline-offset:-1px;box-shadow:0 0 0 2px rgba(34,197,94,.35)}
+  .cell .flag{
+    position:absolute;top:2px;right:3px;font-size:9px;font-weight:800;
+    padding:0 3px;border-radius:4px;
+  }
+  .flag.hot{background:var(--hot);color:#fff}
+  .flag.cold{background:var(--cold);color:#fff}
+  .flag.star{background:#facc15;color:#78350f;left:3px;right:auto}
+  .flag.win{background:#22c55e;color:#052e16;left:3px;right:auto}
+
+  .legend{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11px;color:var(--fg2)}
+  .legend .bar{flex:1;height:8px;border-radius:99px;
+    background:linear-gradient(90deg,#1d4ed8,#22c55e,#eab308,#f97316,#ef4444)}
+
+  .tabs{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+  .tab{padding:7px 12px;border-radius:999px;border:1px solid var(--line);
+    background:var(--bg);color:var(--fg2);font-size:12px;cursor:pointer;user-select:none}
+  .tab.active{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-weight:800}
+
+  .row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  button{border:0;border-radius:10px;padding:11px 14px;font-size:14px;font-weight:700;
+    cursor:pointer;background:var(--accent);color:var(--accent-fg);flex:1 1 auto}
+  button.ghost{background:var(--line);color:var(--fg)}
+  button.warn{background:var(--hot);color:#fff}
+  button.ok{background:#22c55e;color:#052e16}
+  button:active{transform:translateY(1px)}
+  textarea,input[type=text]{
+    width:100%;background:var(--bg);color:var(--fg);
+    border:1px solid var(--line);border-radius:10px;padding:10px;font-size:12px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.5}
+  textarea{min-height:110px}
+  input[type=text]{font-family:inherit;font-size:13px;margin-top:6px}
+
+  .list{max-height:300px;overflow:auto}
+  .li{display:flex;justify-content:space-between;align-items:center;
+    padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px}
+  .li:last-child{border-bottom:0}
+  .li .b{color:var(--accent);font-weight:800}
+  .li .pos{color:var(--fg3);font-size:11px;margin-right:6px}
+  .empty{color:var(--fg3);font-size:13px;padding:8px 0}
+  .hint{color:var(--fg2);font-size:12px;margin-top:6px}
+  .err{color:#fca5a5;font-size:12px;margin-top:6px;word-break:break-all}
+  body.light .err{color:#dc2626}
+
+  .seg{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+  .seg .box{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px}
+  .seg .box .t{font-size:11px;color:var(--fg2);margin-bottom:6px}
+  .seg .mini{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+  .seg .mini i{display:block;aspect-ratio:1/1;border-radius:3px}
+
+  .ds-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+  .ds-item{padding:6px 10px;border-radius:999px;border:1px solid var(--line);
+    background:var(--bg);color:var(--fg2);font-size:12px;cursor:pointer}
+  .ds-item.active{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-weight:800}
+
+  .pred{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px}
+  .pred .p{background:var(--bg);border:1px solid var(--line);border-radius:8px;
+    padding:8px 4px;text-align:center;font-size:12px}
+  .pred .p .n{font-weight:800;font-size:14px}
+  .pred .p .s{color:var(--accent);font-weight:800;font-size:11px;margin-top:2px}
+  .pred .p .r{color:var(--fg3);font-size:10px;margin-top:1px}
+
+  /* 指标 */
+  .metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  @media(min-width:520px){.metrics{grid-template-columns:repeat(4,1fr)}}
+  .metric{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .metric .k{font-size:11px;color:var(--fg2)}
+  .metric .v{font-size:18px;font-weight:800;margin-top:3px}
+  .metric .sub3{font-size:11px;color:var(--fg3);margin-top:2px}
+
+  /* 走势图 */
+  .chart-wrap{position:relative;width:100%;overflow-x:auto}
+  canvas{display:block;background:var(--bg);border-radius:10px}
+
+  /* 开奖记录 */
+  .draw-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+  .draw-row input{flex:1;margin-top:0}
+  .draw-item{background:var(--bg);border:1px solid var(--line);border-radius:10px;
+    padding:8px;margin-bottom:6px;font-size:12px}
+  .draw-item .head{display:flex;justify-content:space-between;color:var(--fg2);margin-bottom:4px}
+  .draw-item .balls{display:flex;gap:4px;flex-wrap:wrap}
+  .ball{display:inline-flex;align-items:center;justify-content:center;
+    width:26px;height:26px;border-radius:50%;font-weight:800;font-size:11px;
+    background:var(--line);color:var(--fg)}
+  .ball.hit{background:#22c55e;color:#052e16}
+  .ball.hot{background:var(--hot);color:#fff}
+  .ball.star{background:#facc15;color:#78350f}
+
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);
+    background:var(--accent);color:var(--accent-fg);padding:10px 16px;border-radius:999px;
+    font-weight:700;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:99}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  details summary{cursor:pointer;color:var(--fg2);font-size:12px;margin-bottom:8px}
+  .capture-hide{display:none !important}
+</style>
+</head>
+<body>
+
+<div id="captureArea">
+  <h1>
+    <span>热力图统计</span>
+    <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">🌙 深色</button>
+  </h1>
+  <div class="sub" id="subInfo">01–49 出现次数热力分布 · 离线可用</div>
+
+  <div class="card"><div class="stats" id="stats"></div></div>
+
+  <div class="card">
+    <h2>热力图 <span class="tag" id="heatTag"></span></h2>
+    <div class="heat" id="heat"></div>
+    <div class="legend"><span>少</span><div class="bar"></div><span>多</span></div>
+    <div class="hint">
+      右上 <span style="color:var(--hot)">H</span> 热号 ·
+      <span style="color:var(--cold)">C</span> 冷号 ·
+      左上 <span style="color:#facc15">★</span> 关注 ·
+      <span style="color:#22c55e">W</span> 上期命中
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>指标统计 <span class="tag" id="metricTag"></span></h2>
+    <div class="metrics" id="metrics"></div>
+  </div>
+
+  <div class="card">
+    <h2>走势图 <span class="tag" id="chartTag"></span></h2>
+    <div class="chart-wrap"><canvas id="chart" width="600" height="200"></canvas></div>
+    <div class="tabs" style="margin-top:10px">
+      <div class="tab active" data-chart="count" onclick="setChart('count')">出现次数</div>
+      <div class="tab" data-chart="sum" onclick="setChart('sum')">和值走势</div>
+      <div class="tab" data-chart="span" onclick="setChart('span')">跨度走势</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>预测下一期热号 <span class="tag" id="predTag"></span></h2>
+    <div class="pred" id="predView"></div>
+    <div class="hint">综合近 20 个号码权重 + 整体热度评分，仅供参考。</div>
+  </div>
+
+  <div class="card">
+    <h2>分组视图 <span class="tag" id="groupTag">每 6 个一组</span></h2>
+    <div class="tabs">
+      <div class="tab" data-group="5" onclick="setGroup(5)">5 个一组</div>
+      <div class="tab active" data-group="6" onclick="setGroup(6)">6 个一组</div>
+      <div class="tab" data-group="7" onclick="setGroup(7)">7 个一组</div>
+    </div>
+    <div id="groupView"></div>
+  </div>
+
+  <div class="card">
+    <h2>分段对比 <span class="tag" id="segTag"></span></h2>
+    <div class="seg" id="segView"></div>
+  </div>
+
+  <div class="card">
+    <div class="tabs">
+      <div class="tab active" data-tab="rank" onclick="setTab('rank')">次数排行</div>
+      <div class="tab" data-tab="hot" onclick="setTab('hot')">热号</div>
+      <div class="tab" data-tab="cold" onclick="setTab('cold')">冷号</div>
+      <div class="tab" data-tab="miss" onclick="setTab('miss')">未出现</div>
+      <div class="tab" data-tab="all" onclick="setTab('all')">全部</div>
+    </div>
+    <div class="list" id="list"></div>
+  </div>
+</div>
+
+<div class="card capture-hide">
+  <h2>数据集</h2>
+  <div class="ds-row" id="dsRow"></div>
+  <div class="row">
+    <button class="ghost" onclick="newDataset()">新建</button>
+    <button class="ghost" onclick="duplicateDataset()">复制当前</button>
+    <button class="warn" onclick="deleteDataset()">删除当前</button>
+  </div>
+  <input type="text" id="dsName" placeholder="当前数据集名称（可改）" oninput="renameDataset()">
+</div>
+
+<div class="card capture-hide">
+  <h2>多数据集对比</h2>
+  <div id="compareView"></div>
+</div>
+
+<div class="card capture-hide">
+  <h2>关注号码</h2>
+  <input type="text" id="starInput" placeholder="例如：06 08 22 45" oninput="saveStars()">
+</div>
+
+<div class="card capture-hide">
+  <h2>开奖记录 & 命中</h2>
+  <div class="draw-row">
+    <input type="text" id="drawInput" placeholder="输入本期号码，如 06 08 22 33 45 49">
+    <button class="ok" onclick="addDraw()" style="flex:0 0 auto">记录</button>
+  </div>
+  <div class="hint">记录后会与当前关注号、热号对比，命中会标绿。</div>
+  <div id="drawList" style="margin-top:10px"></div>
+</div>
+
+<div class="card capture-hide">
+  <details>
+    <summary>数据管理（点击展开）</summary>
+    <textarea id="input" placeholder="在这里粘贴或追加号码..."></textarea>
+    <div class="row">
+      <button onclick="replaceData()">替换统计</button>
+      <button class="ghost" onclick="appendData()">追加统计</button>
+      <button class="warn" onclick="clearAll()">清空</button>
+    </div>
+    <div class="hint err" id="err"></div>
+  </details>
+</div>
+
+<div class="card capture-hide">
+  <div class="row">
+    <button onclick="exportCSV()">导出 CSV</button>
+    <button class="ghost" onclick="captureImage()">截图分享</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ 内置基础数据 ============ */
+const BASE_DATA = `40/08/39/01/38/36/42/13/20/45/49/44/26/02/06/24/32/45/24/25/39/22/47/23/44/14/28/21/45/22/34/33/43/02/06/17/22/15/03/48/49/07/10/22/16/21/02/43/05/30/35/06/20/31/39/21/23/49/24/27/12/30/41/06/46/06/11/04/38/20/21/08/45/10/07/04/20/30/08/31/28/28/17/14/42/33/20/20/12/46/27/46/14/03/47/31/12/41/29/06/08/46/40/19/48/15/12/40/39/16/23/22/02/47/12/40/48/41/38/23/35/02/02/38/36/42/04/41/05/21/33/15/08/35/18/41/07/44/22/08/09/19/27/01/41/35/39/09/41/23/27/03/07/36/39/02/33/05/08/43/46/11/12/17/15/01/12/10/34/03/30/28/42/44/25/25/18/41/40/33/42/17/34/34/08//09/24/36/34/41/48/44/15/13/25/27/23/35/03/01/44/14/47/29/13/05/10/42/04/46/22/34/07/20/26/33/24/03/11/40/13/48/46/17/46/30/17/03/05/42/23/40/45/46/36/04/11/20/20/35/29/04/31/46/19/45/15/39/11/10/07/43/21/05/21/07/10/30/08/42/37/29/44/04/01/23/40/18/13/09/18/23/40/14/43/06/20/20/23/24/11/43/04/35/04/03/36/25/07/11/44/43/14/03/20/33/10/39/40/24/04/22/20/25/06/29/40/26/35/27/02/07/07/31/27/01/43/44/07/39/38/15/12/26/04/40/02/07/11/19/14/06/39/26/39/01/04/36/18/27/13/33/03/42/47/09/39/14/11/21/40/29/12/16/41/42/44/16/08/03/04/12/28/12/36/34/14/11/35/46/37/12/46/01/29/45/26/30/03/40/31/44/04/08/24/01/26/46/44/15/11/23/24/20/07/48/07/13/05/08/19/40/34/45/36/06/32/20/28/24/14/32/02/39/01/21/29/03/45/15/19/12/32/43/23/22/13/15/24/37/05/06/21/38/10/38/44/45/44/01/15/28/44/03/43/21/07/01/25/03/49/47/27/28/25/24/46/23/30/17/45/02/13/19/05/01/37/08/13/25/32/13/11/44/13/46/04/23/45/14/16/16/42/02/22/44/12/08/21/39/14/04/09/26/20/40/38/49/02/26/08/09/07/34/42/19/01/31/13/16/27/45/10/20/45/25/14/19/06/21/08/35/03/23/06/27/35/02/17/07/30/23/29/12/35/34/01/38/23/22/22/04/22/38/28/10/18/45/14/22/16/11/02/06/39/28/08/45/24/01/37/23/17/39/36/04/23/36/33/32/09/01/23/45/04/45/13/14/39/34/43/25/15/46/49/44/08/21/02/14/49/22/29/32/08/47/28/44/42/24/32/46/16/09/48/18/17/33/26/27/03/19/26/13/26/06/13/29/30/20/30/36/41/34/38/05/15/42/32/36/42/39/24/08/13/20/33/26/07/03/14/06/32/02/11/11/09/38/30/25/30/41/32/44/43/33/07/07/20/12/02/13/39/01/24/04/31/49/41/15/07/23/05/08/39/25/43/01/24/11/46/13/45/14/01/13/42/27/48/46/27/45/45/15/11/46/05/42/20/40/10/04/33/12/34/29/45/11/31/49/34/13/48/24/07/03/19/44/43/49/40/02/18/15/34/40/08/09/09/04/49/08/40/28/22/19/16/08/33/47/42/20/44/46/30/27/01/24/46/10/29/35/13/43/44/27/28/43/17/27/08/23/11/34/48/23/38/03/47/13/23/14/49/34/29/07/35/42/28/38/34/11/19/08/21/41/19/`;
+
+/* ============ 状态 ============ */
+let datasets = [];
+let currentDs = 0;
+let allNums = [];
+let counts = new Array(50).fill(0);
+let stars = new Set();
+let draws = [];        // [{text:'06 08 22', nums:[], hits:[], hotHits:[]}, ...]
+let currentTab = 'rank';
+let groupSize = 6;
+let currentChart = 'count';
+
+/* ============ 存储 ============ */
+function saveLocal(){
+  try{
+    localStorage.setItem('heat_datasets', JSON.stringify(datasets));
+    localStorage.setItem('heat_ds_index', String(currentDs));
+    localStorage.setItem('heat_stars', JSON.stringify([...stars]));
+    localStorage.setItem('heat_draws', JSON.stringify(draws));
+    localStorage.setItem('heat_theme', document.body.classList.contains('light')?'light':'dark');
+  }catch(e){}
+}
+function loadLocal(){
+  try{
+    const ds = localStorage.getItem('heat_datasets'); if (ds) datasets = JSON.parse(ds);
+    const idx = localStorage.getItem('heat_ds_index'); if (idx) currentDs = parseInt(idx,10)||0;
+    const st = localStorage.getItem('heat_stars'); if (st) stars = new Set(JSON.parse(st));
+    const dr = localStorage.getItem('heat_draws'); if (dr) draws = JSON.parse(dr);
+    const th = localStorage.getItem('heat_theme'); if (th==='light') document.body.classList.add('light');
+  }catch(e){}
+}
+
+/* ============ 工具 ============ */
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(()=>t.classList.remove('show'), 1500);
+}
+function parseText(text){
+  const raw = text.split(/[\/\s,，、;；\n\r\t]+/);
+  const nums = [], bad = [];
+  for (let s of raw){
+    s = s.trim();
+    if (!s) continue;
+    if (!/^\d{1,2}$/.test(s)){ bad.push(s); continue; }
+    const n = parseInt(s,10);
+    if (n < 1 || n > 49){ bad.push(s); continue; }
+    nums.push(n);
+  }
+  return {nums, bad};
+}
+function rebuildCounts(){
+  counts = new Array(50).fill(0);
+  for (const n of allNums) counts[n]++;
+}
+function pad(n){ return String(n).padStart(2,'0'); }
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+/* ============ 主题 ============ */
+function toggleTheme(){
+  document.body.classList.toggle('light');
+  document.getElementById('themeBtn').textContent =
+    document.body.classList.contains('light') ? '☀️ 浅色' : '🌙 深色';
+  renderChart();
+  saveLocal();
+}
+
+/* ============ 颜色 ============ */
+function heatColor(v, max){
+  if (max <= 0 || v === 0) return {bg:'transparent', fg:'#64748b'};
+  const t = v / max;
+  const stops = [
+    [0.00,[29,78,216]],[0.25,[34,197,94]],[0.50,[234,179,8]],
+    [0.75,[249,115,22]],[1.00,[239,68,68]]
+  ];
+  let a=stops[0], b=stops[stops.length-1];
+  for (let i=0;i<stops.length-1;i++){
+    if (t>=stops[i][0] && t<=stops[i+1][0]){ a=stops[i]; b=stops[i+1]; break; }
+  }
+  const k = (t-a[0]) / ((b[0]-a[0])||1);
+  const r = Math.round(a[1][0]+(b[1][0]-a[1][0])*k);
+  const g = Math.round(a[1][1]+(b[1][1]-a[1][1])*k);
+  const bl= Math.round(a[1][2]+(b[1][2]-a[1][2])*k);
+  const lum = 0.299*r+0.587*g+0.114*bl;
+  return { bg:`rgb(${r},${g},${bl})`, fg: lum>150?'#0b1220':'#ffffff' };
+}
+
+/* ============ 冷热号 ============ */
+function getHotCold(){
+  const vals = counts.slice(1,50).filter(v=>v>0);
+  if (!vals.length) return {hot:new Set(),cold:new Set(),max:0,min:0};
+  const max = Math.max(...vals), min = Math.min(...vals);
+  const hot = new Set(), cold = new Set();
+  for (let i=1;i<=49;i++){
+    if (counts[i]===max && max>0) hot.add(i);
+    if (counts[i]===min && counts[i]>0) cold.add(i);
+  }
+  return {hot,cold,max,min};
+}
+
+/* ============ 指标 ============ */
+function getMetrics(){
+  if (!allNums.length) return null;
+  const groups = [];
+  for (let i=0;i<allNums.length;i+=groupSize){
+    groups.push(allNums.slice(i,i+groupSize));
+  }
+  // 和值、跨度、奇偶、大小
+  const sums = groups.map(g=>g.reduce((a,b)=>a+b,0));
+  const spans = groups.map(g=>Math.max(...g)-Math.min(...g));
+  let odd=0, even=0, big=0, small=0;
+  for (const n of allNums){
+    if (n%2===0) even++; else odd++;
+    if (n>=25) big++; else small++;
+  }
+  return {
+    groupCount: groups.length,
+    avgSum: (sums.reduce((a,b)=>a+b,0)/(sums.length||1)).toFixed(1),
+    maxSum: Math.max(...sums), minSum: Math.min(...sums),
+    avgSpan: (spans.reduce((a,b)=>a+b,0)/(spans.length||1)).toFixed(1),
+    maxSpan: Math.max(...spans), minSpan: Math.min(...spans),
+    odd, even, big, small,
+    sums, spans, groups
+  };
+}
+
+/* ============ 预测 ============ */
+function predict(){
+  const recent = allNums.slice(-20);
+  const rc = new Array(50).fill(0);
+  for (const n of recent) rc[n]++;
+  const maxAll = Math.max(...counts);
+  const maxRec = Math.max(...rc);
+  const arr = [];
+  for (let i=1;i<=49;i++){
+    const sAll = maxAll>0 ? counts[i]/maxAll : 0;
+    const sRec = maxRec>0 ? rc[i]/maxRec : 0;
+    arr.push([i, sRec*0.6 + sAll*0.4, rc[i], counts[i]]);
+  }
+  arr.sort((a,b)=>b[1]-a[1] || b[2]-a[2] || a[0]-b[0]);
+  return arr.slice(0,12);
+}
+
+/* ============ 渲染：统计 ============ */
+function renderStats(){
+  const box = document.getElementById('stats');
+  const appeared = counts.filter((c,i)=>i>=1&&i<=49&&c>0);
+  const max = appeared.length ? Math.max(...appeared) : 0;
+  const min = appeared.length ? Math.min(...appeared) : 0;
+  const used = appeared.length, miss = 49-used;
+  const total = allNums.length;
+  const maxNums=[], minNums=[];
+  for (let i=1;i<=49;i++){
+    if (max>0 && counts[i]===max) maxNums.push(pad(i));
+    if (counts[i]>0 && counts[i]===min) minNums.push(pad(i));
+  }
+  box.innerHTML = `
+    <div class="stat"><div class="k">总号码数</div><div class="v">${total}</div></div>
+    <div class="stat"><div class="k">出现过</div><div class="v">${used}</div></div>
+    <div class="stat"><div class="k">未出现</div><div class="v">${miss}</div></div>
+    <div class="stat"><div class="k">最高次数</div><div class="v">${max}</div><div class="sub2">${maxNums.join(' ')||'-'}</div></div>
+  `;
+  document.getElementById('subInfo').textContent =
+    `${datasets[currentDs].name} · 共 ${total} 个号码 · 覆盖 ${used}/49 · 最高 ${max} 次`;
+}
+
+/* ============ 渲染：热力 ============ */
+function renderHeat(){
+  const box = document.getElementById('heat');
+  const {hot,cold} = getHotCold();
+  const max = Math.max(...counts);
+  // 上期命中
+  const lastDraw = draws.length ? draws[draws.length-1] : null;
+  const winSet = new Set(lastDraw ? lastDraw.nums : []);
+
+  let html = '';
+  for (let i=1;i<=49;i++){
+    const v = counts[i];
+    const {bg,fg} = heatColor(v, max);
+    const dim = v===0?' dim':'';
+    const star = stars.has(i)?' star':'';
+    const win = winSet.has(i)?' win':'';
+    let flag = '';
+    if (hot.has(i)) flag = '<span class="flag hot">H</span>';
+    else if (cold.has(i)) flag = '<span class="flag cold">C</span>';
+    let sflag = stars.has(i)?'<span class="flag star">★</span>':'';
+    let wflag = winSet.has(i)?'<span class="flag win" style="top:auto;bottom:2px;right:3px;left:auto">W</span>':'';
+    html += `<div class="cell${dim}${star}${win}" style="background:${bg};color:${fg}"
+      onclick="toast('${pad(i)} 出现 ${v} 次')">
+      ${flag}${sflag}${wflag}
+      <span class="n">${pad(i)}</span>
+      <span class="c">${v}</span>
+    </div>`;
+  }
+  box.innerHTML = html;
+  document.getElementById('heatTag').textContent = `最多 ${max} 次`;
+}
+
+/* ============ 渲染：指标 ============ */
+function renderMetrics(){
+  const box = document.getElementById('metrics');
+  const m = getMetrics();
+  if (!m){ box.innerHTML = '<div class="empty">暂无数据</div>'; return; }
+  box.innerHTML = `
+    <div class="metric"><div class="k">平均和值</div><div class="v">${m.avgSum}</div>
+      <div class="sub3">范围 ${m.minSum}–${m.maxSum}</div></div>
+    <div class="metric"><div class="k">平均跨度</div><div class="v">${m.avgSpan}</div>
+      <div class="sub3">范围 ${m.minSpan}–${m.maxSpan}</div></div>
+    <div class="metric"><div class="k">奇 / 偶</div><div class="v">${m.odd} / ${m.even}</div>
+      <div class="sub3">${((m.odd/(m.odd+m.even))*100).toFixed(1)}% 奇</div></div>
+    <div class="metric"><div class="k">大 / 小</div><div class="v">${m.big} / ${m.small}</div>
+      <div class="sub3">${((m.big/(m.big+m.small))*100).toFixed(1)}% 大</div></div>
+  `;
+  document.getElementById('metricTag').textContent = `${m.groupCount} 组 · ${groupSize} 个/组`;
+}
+
+/* ============ 渲染：走势图 ============ */
+function setChart(t){
+  currentChart = t;
+  document.querySelectorAll('[data-chart]').forEach(e=>
+    e.classList.toggle('active', e.dataset.chart===t));
+  renderChart();
+}
+
+function renderChart(){
+  const canvas = document.getElementById('chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const m = getMetrics();
+
+  ctx.clearRect(0,0,W,H);
+  const isLight = document.body.classList.contains('light');
+  const bg = isLight ? '#ffffff' : '#0b1220';
+  const fg = isLight ? '#475569' : '#94a3b8';
+  const accent = isLight ? '#0ea5e9' : '#38bdf8';
+  const line = isLight ? '#e2e8f0' : '#1e2f4a';
+
+  ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
+
+  if (!m){
+    ctx.fillStyle = fg; ctx.font = '14px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('暂无数据', W/2, H/2);
+    return;
+  }
+
+  let data = [];
+  let label = '';
+  if (currentChart === 'count'){
+    // 每个号码出现次数（49 个点）
+    data = counts.slice(1,50);
+    label = '出现次数';
+  } else if (currentChart === 'sum'){
+    data = m.sums;
+    label = '和值';
+  } else {
+    data = m.spans;
+    label = '跨度';
+  }
+
+  if (!data.length){ ctx.fillStyle=fg; ctx.fillText('暂无数据', W/2, H/2); return; }
+
+  const padL=30, padR=10, padT=18, padB=24;
+  const cw = W-padL-padR, ch = H-padT-padB;
+  const max = Math.max(...data), min = Math.min(...data);
+  const range = (max-min)||1;
+
+  // 网格
+  ctx.strokeStyle = line; ctx.lineWidth = 1;
+  for (let i=0;i<=4;i++){
+    const y = padT + ch*i/4;
+    ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+  }
+
+  // 坐标
+  ctx.fillStyle = fg; ctx.font = '10px sans-serif';
+  ctx.textAlign = 'right';
+  for (let i=0;i<=4;i++){
+    const v = max - range*i/4;
+    ctx.fillText(String(Math.round(v)), padL-4, padT + ch*i/4 + 3);
+  }
+
+  // 折线
+  ctx.strokeStyle = accent; ctx.lineWidth = 2;
+  ctx.beginPath();
+  data.forEach((v,i)=>{
+    const x = padL + (data.length===1?cw/2:cw*i/(data.length-1));
+    const y = padT + ch*(1-(v-min)/range);
+    if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  // 点
+  ctx.fillStyle = accent;
+  data.forEach((v,i)=>{
+    const x = padL + (data.length===1?cw/2:cw*i/(data.length-1));
+    const y = padT + ch*(1-(v-min)/range);
+    ctx.beginPath(); ctx.arc(x,y,2,0,Math.PI*2); ctx.fill();
+  });
+
+  // 标题
+  ctx.fillStyle = fg; ctx.textAlign='left'; ctx.font='11px sans-serif';
+  ctx.fillText(label + ' · 最高 ' + max + ' · 最低 ' + min, padL, 12);
+
+  document.getElementById('chartTag').textContent = label;
+}
+
+/* ============ 渲染：预测 ============ */
+function renderPred(){
+  const box = document.getElementById('predView');
+  const list = predict();
+  if (!list.length){ box.innerHTML = '<div class="empty">暂无数据</div>'; return; }
+  box.innerHTML = list.map(([n,score,rc,ac])=>`
+    <div class="p">
+      <div class="n">${pad(n)}</div>
+      <div class="s">${(score*100).toFixed(0)}</div>
+      <div class="r">近${rc} 总${ac}</div>
+    </div>
+  `).join('');
+  document.getElementById('predTag').textContent = '前 12 名';
+}
+
+/* ============ 渲染：分组 ============ */
+function setGroup(size){
+  groupSize = size;
+  document.querySelectorAll('[data-group]').forEach(e=>
+    e.classList.toggle('active', parseInt(e.dataset.group)===size));
+  document.getElementById('groupTag').textContent = `每 ${size} 个一组`;
+  renderGroup();
+  renderMetrics();
+  renderChart();
+  renderSegments();
+}
+
+function renderGroup(){
+  const box = document.getElementById('groupView');
+  if (!allNums.length){ box.innerHTML = '<div class="empty">暂无数据</div>'; return; }
+  const groups = [];
+  for (let i=0;i<allNums.length;i+=groupSize) groups.push(allNums.slice(i,i+groupSize));
+  box.innerHTML = groups.map((g,idx)=>{
+    const local = new Array(50).fill(0);
+    for (const n of g) local[n]++;
+    const maxLocal = Math.max(...local);
+    const cells = g.map(n=>{
+      const v = local[n];
+      const {bg,fg} = heatColor(v,maxLocal);
+      const isStar = stars.has(n)?';outline:2px solid #facc15;outline-offset:-2px':'';
+      return `<span style="display:inline-block;width:22px;height:22px;line-height:22px;
+        text-align:center;border-radius:5px;font-size:10px;font-weight:800;
+        background:${bg};color:${fg};margin:2px 2px 0 0${isStar}">${pad(n)}</span>`;
+    }).join('');
+    return `<div style="margin-bottom:10px">
+      <div style="font-size:11px;color:var(--fg3);margin-bottom:4px">第 ${idx+1} 组</div>
+      <div>${cells}</div></div>`;
+  }).join('');
+}
+
+/* ============ 渲染：分段 ============ */
+function renderSegments(){
+  const box = document.getElementById('segView');
+  if (!allNums.length){ box.innerHTML = '<div class="empty">暂无数据</div>'; return; }
+  const segCount = 4;
+  const len = Math.ceil(allNums.length/segCount);
+  let html = '';
+  for (let s=0;s<segCount;s++){
+    const part = allNums.slice(s*len,(s+1)*len);
+    if (!part.length) continue;
+    const local = new Array(50).fill(0);
+    for (const n of part) local[n]++;
+    const max = Math.max(...local);
+    let mini = '';
+    for (let i=1;i<=49;i++){
+      const v = local[i];
+      const {bg} = heatColor(v,max);
+      mini += `<i style="background:${bg}"></i>`;
+    }
+    const top = [];
+    for (let i=1;i<=49;i++) if (local[i]>0) top.push([i,local[i]]);
+    top.sort((a,b)=>b[1]-a[1] || a[0]-b[0]);
+    const topStr = top.slice(0,3).map(([n,c])=>`${pad(n)}(${c})`).join(' ');
+    html += `<div class="box">
+      <div class="t">第 ${s+1} 段 · ${part.length} 个</div>
+      <div class="mini">${mini}</div>
+      <div style="font-size:10px;color:var(--fg3);margin-top:6px">最热：${topStr||'-'}</div>
+    </div>`;
+  }
+  box.innerHTML = html;
+  document.getElementById('segTag').textContent = `${segCount} 段对比`;
+}
+
+/* ============ 渲染：列表 ============ */
+function setTab(t){
+  currentTab = t;
+  document.querySelectorAll('.tab[data-tab]').forEach(e=>
+    e.classList.toggle('active', e.dataset.tab===t));
+  renderList();
+}
+
+function renderList(){
+  const box = document.getElementById('list');
+  let arr = [];
+  for (let i=1;i<=49;i++) arr.push([i, counts[i]]);
+  const {hot,cold} = getHotCold();
+  if (currentTab==='rank') arr = arr.filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]||a[0]-b[0]);
+  else if (currentTab==='hot') arr = arr.filter(x=>hot.has(x[0])).sort((a,b)=>b[1]-a[1]);
+  else if (currentTab==='cold') arr = arr.filter(x=>cold.has(x[0]) && x[1]>0).sort((a,b)=>a[1]-b[1]);
+  else if (currentTab==='miss') arr = arr.filter(x=>x[1]===0);
+  else arr.sort((a,b)=>a[0]-b[0]);
+  if (!arr.length){ box.innerHTML = '<div class="empty">暂无数据</div>'; return; }
+  box.innerHTML = arr.map(([n,c],idx)=>`
+    <div class="li">
+      <span>${currentTab==='rank'?'<span class="pos">#'+(idx+1)+'</span>':''}${pad(n)}${stars.has(n)?' ★':''}</span>
+      <span class="b">${c} 次</span>
+    </div>
+  `).join('');
+}
+
+/* ============ 渲染：数据集 ============ */
+function renderDatasetBar(){
+  const row = document.getElementById('dsRow');
+  row.innerHTML = datasets.map((d,i)=>`
+    <div class="ds-item ${i===currentDs?'active':''}" onclick="switchDataset(${i})">
+      ${escapeHtml(d.name)} (${d.nums.length})
+    </div>
+  `).join('');
+  document.getElementById('dsName').value = datasets[currentDs] ? datasets[currentDs].name : '';
+}
+
+function switchDataset(i){
+  currentDs = i;
+  allNums = datasets[i].nums.slice();
+  rebuildCounts();
+  renderAll();
+  saveLocal();
+  toast('已切换：' + datasets[i].name);
+}
+
+function newDataset(){
+  const name = prompt('新数据集名称：', '数据集 ' + (datasets.length+1));
+  if (name===null) return;
+  datasets.push({ name: name.trim()||('数据集 '+(datasets.length+1)), nums: [] });
+  currentDs = datasets.length-1;
+  allNums = [];
+  rebuildCounts();
+  renderAll();
+  saveLocal();
+}
+
+function duplicateDataset(){
+  const src = datasets[currentDs];
+  datasets.push({ name: src.name + ' 副本', nums: src.nums.slice() });
+  currentDs = datasets.length-1;
+  allNums = datasets[currentDs].nums.slice();
+  rebuildCounts();
+  renderAll();
+  saveLocal();
+  toast('已复制');
+}
+
+function deleteDataset(){
+  if (datasets.length<=1){ toast('至少保留一个'); return; }
+  if (!confirm('确定删除当前数据集？')) return;
+  datasets.splice(currentDs,1);
+  currentDs = 0;
+  allNums = datasets[0].nums.slice();
+  rebuildCounts();
+  renderAll();
+  saveLocal();
+}
+
+function renameDataset(){
+  const v = document.getElementById('dsName').value.trim();
+  if (!v) return;
+  datasets[currentDs].name = v;
+  renderDatasetBar();
+  renderStats();
+  saveLocal();
+}
+
+/* ============ 渲染：多数据集对比 ============ */
+function renderCompare(){
+  const box = document.getElementById('compareView');
+  if (datasets.length < 2){
+    box.innerHTML = '<div class="empty">至少需要 2 个数据集才能对比</div>';
+    return;
+  }
+  // 每个数据集生成 49 个格子
+  box.innerHTML = datasets.map((d,idx)=>{
+    const c = new Array(50).fill(0);
+    for (const n of d.nums) c[n]++;
+    const max = Math.max(...c);
+    let mini = '';
+    for (let i=1;i<=49;i++){
+      const v = c[i];
+      const {bg} = heatColor(v,max);
+      mini += `<i style="display:block;aspect-ratio:1/1;border-radius:3px;background:${bg}"></i>`;
+    }
+    return `<div style="margin-bottom:10px">
+      <div style="font-size:11px;color:var(--fg2);margin-bottom:4px">
+        ${escapeHtml(d.name)} · ${d.nums.length} 个
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">${mini}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ============ 渲染：开奖记录 ============ */
+function addDraw(){
+  const v = document.getElementById('drawInput').value;
+  const {nums} = parseText(v);
+  if (!nums.length){ toast('请输入号码'); return; }
+  const {hot} = getHotCold();
+  const hits = nums.filter(n=>stars.has(n));
+  const hotHits = nums.filter(n=>hot.has(n));
+  draws.push({ text: v, nums, hits, hotHits, time: Date.now() });
+  document.getElementById('drawInput').value = '';
+  renderDraws();
+  renderHeat();
+  saveLocal();
+  toast(`已记录 · 关注命中 ${hits.length} · 热号命中 ${hotHits.length}`);
+}
+
+function removeDraw(idx){
+  draws.splice(idx,1);
+  renderDraws();
+  renderHeat();
+  saveLocal();
+}
+
+function renderDraws(){
+  const box = document.getElementById('drawList');
+  if (!draws.length){ box.innerHTML = '<div class="empty">暂无开奖记录</div>'; return; }
+  box.innerHTML = draws.slice().reverse().map((d, ri)=>{
+    const idx = draws.length-1-ri;
+    const balls = d.nums.map(n=>{
+      let cls = 'ball';
+      if (d.hits.includes(n)) cls += ' hit';
+      else if (d.hotHits.includes(n)) cls += ' hot';
+      else if (stars.has(n)) cls += ' star';
+      return `<span class="${cls}">${pad(n)}</span>`;
+    }).join('');
+    return `<div class="draw-item">
+      <div class="head">
+        <span>第 ${idx+1} 期 · ${new Date(d.time).toLocaleString()}</span>
+        <span style="cursor:pointer;color:#f87171" onclick="removeDraw(${idx})">删除</span>
+      </div>
+      <div class="balls">${balls}</div>
+      <div style="font-size:11px;color:var(--fg3);margin-top:4px">
+        关注命中 ${d.hits.length} 个 · 热号命中 ${d.hotHits.length} 个
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ============ 关注号码 ============ */
+function saveStars(){
+  const v = document.getElementById('starInput').value;
+  const set = new Set();
+  for (const s of v.split(/[\s,，、;；]+/)){
+    if (/^\d{1,2}$/.test(s)){
+      const n = parseInt(s,10);
+      if (n>=1 && n<=49) set.add(n);
+    }
+  }
+  stars = set;
+  renderHeat();
+  renderGroup();
+  renderList();
+  saveLocal();
+}
+
+/* ============ 数据操作 ============ */
+function replaceData(){
+  const {nums,bad} = parseText(document.getElementById('input').value);
+  datasets[currentDs].nums = nums.slice();
+  allNums = nums.slice();
+  rebuildCounts();
+  document.getElementById('err').textContent = bad.length ? '已忽略：'+bad.slice(0,30).join('、') : '';
+  renderAll();
+  saveLocal();
+  toast('已替换');
+}
+
+function appendData(){
+  const {nums,bad} = parseText(document.getElementById('input').value);
+  datasets[currentDs].nums = datasets[currentDs].nums.concat(nums);
+  allNums = datasets[currentDs].nums.slice();
+  rebuildCounts();
+  document.getElementById('err').textContent = bad.length ? '已忽略：'+bad.slice(0,30).join('、') : '';
+  renderAll();
+  saveLocal();
+  toast('已追加 ' + nums.length + ' 个');
+}
+
+function clearAll(){
+  datasets[currentDs].nums = [];
+  allNums = [];
+  rebuildCounts();
+  document.getElementById('input').value = '';
+  document.getElementById('err').textContent = '';
+  renderAll();
+  saveLocal();
+  toast('已清空');
+}
+
+/* ============ 导出 CSV ============ */
+function exportCSV(){
+  const {hot,cold} = getHotCold();
+  let csv = '号码,次数,标记,关注\n';
+  for (let i=1;i<=49;i++){
+    let tag = '';
+    if (hot.has(i)) tag = '热号';
+    else if (cold.has(i) && counts[i]>0) tag = '冷号';
+    csv += `${pad(i)},${counts[i]},${tag},${stars.has(i)?'★':''}\n`;
+  }
+  const m = getMetrics();
+  if (m){
+    csv += `\n指标\n平均和值,${m.avgSum}\n和值范围,${m.minSum}-${m.maxSum}\n`;
+    csv += `平均跨度,${m.avgSpan}\n跨度范围,${m.minSpan}-${m.maxSpan}\n`;
+    csv += `奇,${m.odd}\n偶,${m.even}\n大,${m.big}\n小,${m.small}\n`;
+  }
+  csv += `\n预测前12\n号码,评分,近期,总次数\n`;
+  for (const [n,s,rc,ac] of predict()) csv += `${pad(n)},${(s*100).toFixed(1)},${rc},${ac}\n`;
+
+  if (draws.length){
+    csv += `\n开奖记录\n期号,号码,关注命中,热号命中\n`;
+    draws.forEach((d,i)=>{
+      csv += `${i+1},"${d.nums.map(pad).join(' ')}",${d.hits.length},${d.hotHits.length}\n`;
+    });
+  }
+
+  const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `号码统计_${datasets[currentDs].name}_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('CSV 已导出');
+}
+
+/* ============ 截图 ============ */
+function captureImage(){
+  if (typeof html2canvas === 'undefined'){
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+    s.onload = doCapture;
+    s.onerror = ()=>toast('截图库加载失败');
+    document.head.appendChild(s);
+  } else doCapture();
+}
+function doCapture(){
+  toast('正在生成...');
+  const area = document.getElementById('captureArea');
+  html2canvas(area, {
+    backgroundColor: document.body.classList.contains('light') ? '#f1f5f9' : '#0b1220',
+    scale: 2, useCORS: true
+  }).then(canvas=>{
+    canvas.toBlob(blob=>{
+      const file = new File([blob], '热力图统计.png', {type:'image/png'});
+      if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
+        navigator.share({ files:[file], title:'热力图统计' }).catch(()=>{
+          downloadBlob(URL.createObjectURL(blob));
+        });
+      } else {
+        downloadBlob(URL.createObjectURL(blob));
+      }
+    }, 'image/png');
+  }).catch(()=>toast('生成失败'));
+}
+function downloadBlob(url){
+  const a = document.createElement('a');
+  a.href = url; a.download = '热力图统计_' + Date.now() + '.png';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  toast('已保存');
+}
+
+/* ============ 渲染总入口 ============ */
+function renderAll(){
+  renderStats();
+  renderHeat();
+  renderMetrics();
+  renderChart();
+  renderPred();
+  renderGroup();
+  renderSegments();
+  renderList();
+  renderDatasetBar();
+  renderCompare();
+  renderDraws();
+}
+
+/* ============ 初始化 ============ */
+(function init(){
+  loadLocal();
+  if (!datasets.length){
+    const {nums} = parseText(BASE_DATA);
+    datasets = [{ name:'基础数据', nums }];
+    currentDs = 0;
+  }
+  if (currentDs >= datasets.length) currentDs = 0;
+  allNums = datasets[currentDs].nums.slice();
+  rebuildCounts();
+
+  document.getElementById('starInput').value = [...stars].map(pad).join(' ');
+  document.getElementById('themeBtn').textContent =
+    document.body.classList.contains('light') ? '☀️ 浅色' : '🌙 深色';
+
+  renderAll();
+})();
+
+/* ============ Service Worker ============ */
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
